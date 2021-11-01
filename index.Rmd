@@ -19,15 +19,20 @@ tidy=TRUE, tidy.opts=list(width.cutoff=60), R.options=list(max.print=100))
 
 ## Data Wrangling, Exploration, Visualization
 
-### Name and EID here
+### Sebastian Granada sg46324
 
 #### Introduction 
 
-Paragraph or two introducing your datasets and variables, why they are interesting to you, etc.
+  *One of if not the highest honor for a soccer player is to represent, play, and win for your national team, and there is no better venue to do those things at than the FIFA World Cup. The WorldCupRecords dataset is complete with information on times participated, matches played, wins, draws, losses, goals scored/conceded, points accumulated, and number of honors recieved for every country who have competed in the World Cup since 1930. The fifa_audience dataset looks at every country who is a member of FIFA and their confederation, share of global population, share of World Cup TV audience, and their GDP-weighted audience share. What I wish to see with this data are potential trends or correlation in World Cup success/opportunity to host and that country's global population, World Cup TV audience, and World Cup TV GDP share.*
+  
+  *Soccer is my favorite sport and it has been a part of my life for as long as I can remember. I started off just playing, but in Middle School I started to watch and follow a number of teams. Now, I am fully engrossed in soccer statistics for players, clubs, and national teams. By combining these datasets I hope to learn more about countries' contributions to FIFA through the World Cup and see if it is "worth it." For example, are countries who are watching the World Cup more also experiencing more success at the World Cup?*
+  
 
 ```{R}
-# read your datasets in here, e.g., with read_csv()
-
+#read datasets
+library(tidyverse)
+fifa_audience <- fivethirtyeight::fifa_audience
+WorldCupRecords <- read_csv("~/WorldCupRecords.csv")
 ```
 
 #### Tidying: Reshaping
@@ -36,51 +41,105 @@ If your datasets are tidy already, demonstrate that you can reshape data with pi
 
 ```{R}
 # your tidying code (if applicable; can also wait until wrangling section)
-```
+library(tidyr)
+fifa_audience <- fifa_audience %>% as.data.frame()
+WorldCupRecords <- WorldCupRecords
 
+```
+*Will be waiting until the wrangling section so I can reshape my summary statistics.*
     
 #### Joining/Merging
 
 ```{R}
 # your joining code
-
-# your joining code
+library(dplyr)
+fifa_audience %>% dim()
+WorldCupRecords %>% dim()
+WorldCup_audience <- fifa_audience %>% full_join(WorldCupRecords, by=c("country"))
 ```
 
-Discussions of joining here. Feel encouraged to break up into more than once code chunk and discuss each in turn.
+*In the code above I used the dim() function to return the number of rows/observation and columns/variables and there are 191 observations, or countries, in the fifa_audience dataset and 78 observations, or countries, in the WorldCupRecords dataset. This means there are 113 countries from the fifa_audience dataset, countries recognized by FIFA, that have yet to appear in a World Cup.The datasets are joined by country as this is the only ID the datasets have in common and this what I want to group my observations off of. Additionally a full_join was used so I could keep all the observations and variables from both datasets. After joining, there are 198 observations and 14 variables. While every country from WorldCupRecords should be accounted for in fifa_audience, we see an increase in rows because the fifa_audience joined all the countries in the United Kingdom whereas the WorldCupRecords has them separated as each country competes individually in soccer. Additionally, United Arab Emirates participated in a World Cup, but is not listed in the fifa_audience dataset so this adds another row to the joined dataset. There were no rows dropped after joining. The IDs unique to fifa_audience are cofederation, population_share, tv_audience_share, and gdp_weighted_share. The IDs unique to WorldCupRecords are participated, matches, draws, wins, losses, GF, GA, points, and honors. Both sets of IDs are defined in the introductory paragraph.*
 
 ####  Wrangling
 
 ```{R}
-# your wrangling code
+# your wrangling code - mutate
+table1 <- WorldCup_audience %>% replace_na(list(participated=0,matches=0,wins=0,draws=0,
+                                      losses=0,GF=0,GA=0,points=0,honors=0)) %>%
+  na.omit %>%
+  mutate(total_points=sum(points),points_share=(points/total_points)*100, vowel_start=str_detect(country,"^[AEIOU]")) %>% select(country,points_share,vowel_start) %>% filter(points_share>0)
+            
+# your wrangling code - summarize with 5 unique, defined functions grouped by a categorical variable
+table2 <- WorldCup_audience %>% replace_na(list(participated=0,matches=0,wins=0,draws=0,
+                                      losses=0,GF=0,GA=0,points=0,honors=0)) %>%
+  group_by(confederation) %>% na.omit() %>%
+  summarise(n_countries=n(),
+            total_tv_share=sum(tv_audience_share),
+            avg_tv_share=mean(tv_audience_share),
+            sd_tv_share=sd(tv_audience_share),
+            total_points=sum(points),
+            points_per_country=total_points/n_countries,
+            sd_points=sd(points),
+            cor(tv_audience_share,points)) %>% arrange(-n_countries)
 
-# your wrangling code
+# your wrangling code - count of unique observations in categorical variables
+library(knitr)
+table3 <- WorldCup_audience %>% replace_na(list(participated=0,matches=0,wins=0,draws=0,
+                                      losses=0,GF=0,GA=0,points=0,honors=0)) %>%
+  na.omit() %>% 
+  summarise(n_confed=n_distinct(confederation),n_country=n_distinct(country)) %>%
+  kable(align='c',col.names = str_to_title(names(.)))
 
-# your wrangling code
 ```
 
-Your discussion of wrangling section here. Feel encouraged to break up into more than once code chunk and discuss each in turn.
-
+  *For each table the first thing I did was change any NAs in the WorldCupRecords dataset to 0 so that countries who have not featured in a World Cup, countries in fifa_audience but not WorldCupRecords, could still be accounted for in my calculations. However, a na.omit() was used to remove the countries from the UK since the fifa_audience dataset has them grouped as United Kingdom whereas WorldCupRecords has information for each country in the UK, so any calculations done will not be taking into account the countries who competed in the World Cup from the UK. These needed to be removed because the discrepancies in datasets made it seem like there is a seventh confederation when in fact the countries in the UK compete in UEFA independent of one another. Moving forward, In the first table I created two new variables using mutate() giving each country's percentage of total points in the World Cup and a logic variable saying if the country's name beings with a vowel or not. Then I specified the table to only give me countries who have recorded points at the World Cup with filter(). The third table is a simple table giving the counts of distinct responses for both of the categorical variables in the WorldCup_audience dataset using n_distinct() for each categorical variable in a summarise() returning 6 confederations and 191 countries.*
+  
+  *The second table will serve as the summary statistics table. Here I compared points and share of global World Cup TV audience (tv_audience_share), as a percentage, between confederations using group_by(). First I took a count of how many countries are in each confederation using n(). Additionally I used sum() to find total points accumulated from each confederation as well as the total percentage of global World Cup TV audience. Second I used mean() and sd() to find the average and standard deviation of percentage of global World Cup TV audience per confederation. I used sd() again to find the standard deviation of points per confederation as well as using two functions I created, number of countries and total points accumulated, to find the points per country in each confederation. Lastly, I used cor() to find the correlation between percentage of global World Cup TV audience and points for each confederation to see if there is a relationship between watching the World Cup and success in the World Cup in terms of points. Then I proceeded to organize the table from descending number of countries in each confederation using arrange(). The most interesting oberservations from here was that the regions with the most World Cup success, UEFA (Europe and Russia) and CONMEBOL (South America), had the highest correlation between TV audience and points. However, the region that contributes the most to the global World Cup TV audience, AFC (Asia), has the most countries/individuals but the lowest correlation. Meaning though Asian countries are the biggest fans in terms of watching the World Cup their countries still experience minimal success in the World Cup.* 
 
 #### Visualizing
 
 ```{R}
-# your plot 1
+#plot 1
+red.bold.italic.text <- element_text(face = "bold.italic", color = "red")
+
+WorldCup_audience %>% replace_na(list(participated=0,matches=0,wins=0,draws=0, losses=0,GF=0,GA=0,points=0,honors=0)) %>% na.omit %>%
+  ggplot(aes(x=confederation,y=points,fill=confederation)) +
+  geom_bar(stat="summary",fun=mean,color="black") +
+  geom_errorbar(stat="summary",fun.data=mean_se, width=0.4, color="Red") +
+  geom_point(stat="summary",fun=mean,color="Blue") + 
+  theme(legend.position="none") + ggtitle("Mean Points at World Cup") +
+  scale_y_continuous(name="Points",n.breaks=20) + xlab("Confederation") + 
+  theme(title = red.bold.italic.text, axis.title = red.bold.italic.text)
+
 ```
 
-Your discussion of plot 1
+*Here I graphed a barplot of the mean points accumulated in each confederation along with the standard error bars. We see in this graph that the two confederations with the highest average points also have the most variation. This is likely due to the presence of countries in both confederations who are both very successful and not so successful in terms of points accumulated at the World Cup. Additionally there is less variation in the confederations with low average points meaning there are few outliers in those confederations. In other words, there aren't any countries who perform much better than the others in their conferences at the World Cup.*
 
 ```{R}
-# your plot 2
+#plot 2
+WorldCup_audience %>% 
+  replace_na(list(participated=0,matches=0,wins=0,draws=0, losses=0,GF=0,GA=0,points=0,honors=0)) %>%
+  na.omit %>% 
+  ggplot(aes(x=tv_audience_share,y=points,color=confederation)) + 
+  geom_point(size=2) + geom_smooth(method="lm") + theme(legend.position="none") +
+  theme_minimal() + ggtitle("Points Accumulated vs Percent of World Cup TV Audience")+ 
+  scale_x_continuous(name="Percent of World Cup TV Audience",n.breaks=20) +
+  scale_y_continuous(name="Points Accumulated",n.breaks=20)
 ```
 
-Your discussion of plot 2
+*In this graph I plotted points accumulated at the World Cup as a function of percent of World Cup TV audience per country and added a linear regression line for each confederation. Most countries have less than 60 points, but the few countries from each confederation that do get some success at the World Cup are driving the correlation as seen in the linear regression lines. It can be observed from this graph that there is a general positive correlation between countries watching the World Cup and success at the World Cup, but for the AFC that sees very little success at the World Cup but has the highest percentages of World Cup TV audience there is a very slight positive association. These observations are in agreement with the correlation calculations between tv_audience_share and points made in table2.*
 
 ```{R}
-# your plot 3
+#plot 3
+WorldCup_audience %>% replace_na(list(participated=0,matches=0,wins=0,draws=0, losses=0,GF=0,GA=0,points=0,honors=0)) %>% na.omit %>% filter(honors>0) %>%
+  ggplot(aes(x=honors,fill=confederation)) + geom_histogram(bins=10,color="Black")+
+  xlim(0,12) + ggtitle("Honors by Confederation")+ 
+  scale_x_continuous(name="Number of Honors",n.breaks=10) +
+  scale_y_continuous(name="Count",n.breaks=20)
+
 ```
 
-Your discussion of plot 3
+*This histogram shows the amount of countries hold a certain number of honors as well as the distribution of honors between confederations. It is apparent that of the three confederations that have honors UEFA (Europe) holds the most. This histogram is significant in that it shows how Europeans teams have most dominated the World Cup in terms of honors (1st-3rd place finishes).*
 
 #### Concluding Remarks
 
